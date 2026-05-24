@@ -8,7 +8,7 @@ from datetime import datetime
 
 st.set_page_config(
     page_title="Ranim Store Pro",
-    page_icon="🛍",
+    page_icon="🛍️",
     layout="wide"
 )
 
@@ -198,10 +198,9 @@ if "logged_in_user" not in st.session_state:
 
 if st.session_state["logged_in_user"] is None:
 
-
     st.markdown("""
     <div style='text-align:center;padding:40px;'>
-        <h1>🛍 منظومة متجر رنيم</h1>
+        <h1>🛍️ منظومة متجر رنيم</h1>
         <h3>نظام إدارة احترافي للمخزون والمحاسبة</h3>
     </div>
     """, unsafe_allow_html=True)
@@ -273,7 +272,7 @@ else:
 
     if choice == "الرئيسية":
 
-        st.title("🛍 مرحباً بك في منظومة متجر رنيم")
+        st.title("🛍️ مرحباً بك في منظومة متجر رنيم")
 
         st.caption(
             "إدارة المخزون والأرباح والخزائن المالية"
@@ -384,7 +383,6 @@ else:
         )
 
         if st.button("حفظ تعديل المحفظة"):
-
 
             cursor.execute("""
             UPDATE wallets
@@ -560,7 +558,6 @@ else:
 
                 else:
 
-
                     new_capital = (
                         current_capital - total_cost
                     )
@@ -622,7 +619,7 @@ else:
         st.divider()
 
         # حذف منتج
-        st.subheader("🗑 حذف منتج")
+        st.subheader("🗑️ حذف منتج")
 
         delete_id = st.number_input(
             "رقم المنتج",
@@ -718,7 +715,6 @@ else:
                     total_capital = (
                         capital * qty_to_sell
                     )
-
 
                     net_profit = round(
                         total_sale - total_capital,
@@ -857,7 +853,6 @@ else:
             else:
                 st.error("المنتج غير موجود")
 
-
     # =====================================
     # سجل العمليات
     # =====================================
@@ -925,3 +920,6 @@ else:
 
         else:
             st.info("السجل المالي فارغ")
+
+
+
