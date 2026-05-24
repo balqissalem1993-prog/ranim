@@ -1,15 +1,64 @@
 import streamlit as st
 import sqlite3
+from datetime import datetime
 
-# ==============================
-# تجهيز قاعدة البيانات
-# ==============================
+# =====================================
+# إعداد الصفحة
+# =====================================
+
+st.set_page_config(
+    page_title="Ranim Store Pro",
+    page_icon="🛍",
+    layout="wide"
+)
+
+# =====================================
+# تصميم الواجهة
+# =====================================
+
+st.markdown("""
+<style>
+.main {
+    background-color: #f8f9fc;
+}
+
+.block-container {
+    padding-top: 2rem;
+}
+
+.stMetric {
+    background: white;
+    padding: 15px;
+    border-radius: 15px;
+    border: 1px solid #e5e7eb;
+}
+
+h1, h2, h3 {
+    color: #111827;
+}
+
+div.stButton > button {
+    border-radius: 10px;
+    height: 45px;
+    font-weight: bold;
+}
+</style>
+""", unsafe_allow_html=True)
+
+# =====================================
+# قاعدة البيانات
+# =====================================
+
 
 def init_db():
-    conn = sqlite3.connect("smart_store.db", check_same_thread=False)
+    conn = sqlite3.connect(
+        "smart_store.db",
+        check_same_thread=False
+    )
+
     cursor = conn.cursor()
 
-    # جدول المنتجات
+    # المنتجات
     cursor.execute("""
     CREATE TABLE IF NOT EXISTS products (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -20,48 +69,87 @@ def init_db():
     )
     """)
 
-    # جدول المحافظ
+    # محافظ الأرباح
     cursor.execute("""
     CREATE TABLE IF NOT EXISTS wallets (
-        partner_name TEXT PRIMARY KEY,
+        partner_name TEXT,
+        account_type TEXT,
+        balance REAL,
+        PRIMARY KEY (partner_name, account_type)
+    )
+    """)
+
+    # خزائن رأس المال
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS capital_accounts (
+        account_type TEXT PRIMARY KEY,
         balance REAL
     )
     """)
 
-    # جدول العمليات
+    # سجل العمليات
     cursor.execute("""
     CREATE TABLE IF NOT EXISTS transactions (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         product_name TEXT,
         quantity INTEGER,
         total REAL,
+        capital REAL,
         profit REAL,
         payment_method TEXT,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )
     """)
 
-    # إدخال المحافظ إن لم تكن موجودة
+    # السجل المالي
     cursor.execute("""
-    INSERT OR IGNORE INTO wallets (partner_name, balance)
-    VALUES ('Bashir', 0.0)
+    CREATE TABLE IF NOT EXISTS financial_logs (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        action_type TEXT,
+        account_type TEXT,
+        amount REAL,
+        note TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )
+    """)
+
+    # المحافظ الافتراضية
+    defaults = [
+        ('Bashir', 'cash', 0),
+        ('Bashir', 'bank', 0),
+        ('Ahmed', 'cash', 0),
+        ('Ahmed', 'bank', 0)
+    ]
+
+    for row in defaults:
+        cursor.execute("""
+        INSERT OR IGNORE INTO wallets
+        VALUES (?, ?, ?)
+        """, row)
+
+    # الخزائن الافتراضية
+    cursor.execute("""
+    INSERT OR IGNORE INTO capital_accounts
+    VALUES ('cash', 0)
     """)
 
     cursor.execute("""
-    INSERT OR IGNORE INTO wallets (partner_name, balance)
-    VALUES ('Ahmed', 0.0)
+    INSERT OR IGNORE INTO capital_accounts
+    VALUES ('bank', 0)
     """)
 
     conn.commit()
+
     return conn
 
 
 conn = init_db()
 cursor = conn.cursor()
 
-# ==============================
+# =====================================
 # حساب رأس المال
-# ==============================
+# =====================================
+
 
 def calculate_capital(
     price_yuan,
@@ -71,8 +159,14 @@ def calculate_capital(
     dollar_rate,
     shipping_rate
 ):
-    product_cost_lyd = (price_yuan * 0.14) * dollar_rate
-    shipping_cost_lyd = (weight * shipping_rate) * dollar_rate
+
+    product_cost_lyd = (
+        price_yuan * 0.14
+    ) * dollar_rate
+
+    shipping_cost_lyd = (
+        weight * shipping_rate
+    ) * dollar_rate
 
     total = (
         product_cost_lyd
@@ -83,19 +177,9 @@ def calculate_capital(
 
     return round(total, 2)
 
-# ==============================
-# إعدادات الصفحة
-# ==============================
-
-st.set_page_config(
-    page_title="Ranim Store Secure",
-    page_icon="🔒",
-    layout="wide"
-)
-
-# ==============================
-# الرموز السرية
-# ==============================
+# =====================================
+# تسجيل الدخول
+# =====================================
 
 if "user_tokens" not in st.session_state:
     st.session_state["user_tokens"] = {
@@ -105,23 +189,27 @@ if "user_tokens" not in st.session_state:
 
 USER_TOKENS = st.session_state["user_tokens"]
 
-# ==============================
-# حالة تسجيل الدخول
-# ==============================
-
 if "logged_in_user" not in st.session_state:
     st.session_state["logged_in_user"] = None
 
-# ==============================
-# شاشة تسجيل الدخول
-# ==============================
+# =====================================
+# واجهة الدخول
+# =====================================
 
 if st.session_state["logged_in_user"] is None:
 
-    st.subheader("🔒 نظام إدارة متجر رنيم الآمن")
+
+    st.markdown("""
+    <div style='text-align:center;padding:40px;'>
+        <h1>🛍 منظومة متجر رنيم</h1>
+        <h3>نظام إدارة احترافي للمخزون والمحاسبة</h3>
+    </div>
+    """, unsafe_allow_html=True)
+
+    st.info("🔒 الرجاء إدخال الرمز السري للمتابعة")
 
     token_input = st.text_input(
-        "أدخل الرمز السري الخاص بك:",
+        "الرمز السري",
         type="password"
     )
 
@@ -129,63 +217,74 @@ if st.session_state["logged_in_user"] is None:
 
         if token_input in USER_TOKENS:
 
-            st.session_state["logged_in_user"] = USER_TOKENS[token_input]
+            st.session_state[
+                "logged_in_user"
+            ] = USER_TOKENS[token_input]
 
-            st.success(
-                f"مرحباً بك يا {st.session_state['logged_in_user']}"
-            )
+            st.success("تم تسجيل الدخول بنجاح")
 
             st.rerun()
 
         else:
             st.error("الرمز السري غير صحيح")
 
-# ==============================
-# بعد تسجيل الدخول
-# ==============================
+# =====================================
+# الواجهة الرئيسية
+# =====================================
 
 else:
 
-    current_user = st.session_state["logged_in_user"]
+    current_user = st.session_state[
+        "logged_in_user"
+    ]
 
-    # تسجيل خروج
-    if st.sidebar.button("🚪 تسجيل الخروج"):
-        st.session_state["logged_in_user"] = None
-        st.rerun()
+    # القائمة الجانبية
+    st.sidebar.title("⚙️ لوحة التحكم")
 
-    st.title("📦 لوحة تحكم متجر رنيم")
-
-    st.markdown(
-        f"👤 المستخدم الحالي: **{current_user}**"
+    st.sidebar.success(
+        f"مرحباً {current_user}"
     )
 
-    # القائمة
+    if st.sidebar.button("🚪 تسجيل الخروج"):
+        st.session_state[
+            "logged_in_user"
+        ] = None
+
+        st.rerun()
+
     menu = [
-        "لوحة التحكم والمحافظ",
+        "الرئيسية",
+        "الخزائن والمحافظ",
         "إضافة وتحديث البضاعة",
         "تسجيل عملية بيع",
         "الاستعلام عن منتج",
-        "سجل العمليات"
+        "سجل العمليات",
+        "السجل المالي"
     ]
 
     choice = st.sidebar.selectbox(
-        "القائمة الرئيسية",
+        "القائمة",
         menu
     )
 
-    # ==========================================
-    # لوحة التحكم والمحافظ
-    # ==========================================
+    # =====================================
+    # الرئيسية
+    # =====================================
 
-    if choice == "لوحة التحكم والمحافظ":
+    if choice == "الرئيسية":
 
-        st.header("👥 المحافظ المالية")
+        st.title("🛍 مرحباً بك في منظومة متجر رنيم")
 
-        cursor.execute(
-            "SELECT partner_name, balance FROM wallets"
+        st.caption(
+            "إدارة المخزون والأرباح والخزائن المالية"
         )
 
-        wallets = {
+        # الخزائن
+        cursor.execute(
+            "SELECT * FROM capital_accounts"
+        )
+
+        capitals = {
             row[0]: row[1]
             for row in cursor.fetchall()
         }
@@ -194,159 +293,164 @@ else:
 
         with col1:
             st.metric(
-                "محفظة بشير",
-                f"{wallets.get('Bashir', 0.0)} د.ل"
+                "💵 خزنة الكاش",
+                f"{capitals.get('cash',0)} د.ل"
             )
 
         with col2:
             st.metric(
-                "محفظة أحمد",
-                f"{wallets.get('Ahmed', 0.0)} د.ل"
+                "🏦 خزنة المصرف",
+                f"{capitals.get('bank',0)} د.ل"
             )
-
-        # ==========================
-        # سحب الأموال
-        # ==========================
 
         st.divider()
 
-        st.subheader(
-            f"💸 سحب من محفظتك ({current_user})"
+        # إحصائيات
+        cursor.execute(
+            "SELECT COUNT(*) FROM products"
         )
+        products_count = cursor.fetchone()[0]
 
-        withdraw_amount = st.number_input(
-            "المبلغ المراد سحبه",
-            min_value=0.0,
-            step=1.0
+        cursor.execute(
+            "SELECT COUNT(*) FROM transactions"
         )
+        sales_count = cursor.fetchone()[0]
 
-        if st.button("تأكيد السحب"):
+        cursor.execute(
+            "SELECT IFNULL(SUM(profit),0) FROM transactions"
+        )
+        total_profit = cursor.fetchone()[0]
 
-            current_balance = wallets.get(
-                current_user,
-                0.0
+        c1, c2, c3 = st.columns(3)
+
+        with c1:
+            st.metric(
+                "📦 المنتجات",
+                products_count
             )
 
-            if withdraw_amount > current_balance:
+        with c2:
+            st.metric(
+                "🧾 المبيعات",
+                sales_count
+            )
 
-                st.error("الرصيد غير كافٍ")
+        with c3:
+            st.metric(
+                "📈 إجمالي الأرباح",
+                f"{round(total_profit,2)} د.ل"
+            )
 
-            elif withdraw_amount <= 0:
+    # =====================================
+    # الخزائن والمحافظ
+    # =====================================
 
-                st.warning("أدخل مبلغ صحيح")
+    elif choice == "الخزائن والمحافظ":
 
-            else:
+        st.header("💰 إدارة الخزائن والمحافظ")
 
-                new_balance = round(
-                    current_balance - withdraw_amount,
-                    2
-                )
+        # عرض المحافظ
+        cursor.execute(
+            "SELECT * FROM wallets"
+        )
 
-                cursor.execute("""
-                UPDATE wallets
-                SET balance = ?
-                WHERE partner_name = ?
-                """, (
-                    new_balance,
-                    current_user
-                ))
+        wallets = cursor.fetchall()
 
-                conn.commit()
+        for wallet in wallets:
 
-                st.success("تم السحب بنجاح")
+            st.info(
+                f"{wallet[0]} | {wallet[1]} | {wallet[2]} د.ل"
+            )
 
-                st.rerun()
+        st.divider()
 
-        # ==========================
         # تعديل المحافظ
-        # ==========================
-
-        st.divider()
-
         st.subheader("⚙️ تعديل المحافظ")
 
-        partner_edit = st.selectbox(
-            "اختر المحفظة",
+        partner = st.selectbox(
+            "الشريك",
             ["Bashir", "Ahmed"]
+        )
+
+        wallet_type = st.selectbox(
+            "نوع المحفظة",
+            ["cash", "bank"]
         )
 
         new_balance = st.number_input(
             "الرصيد الجديد",
             min_value=0.0,
-            step=1.0,
-            key="balance_edit"
+            step=1.0
         )
 
-        if st.button("حفظ الرصيد الجديد"):
+        if st.button("حفظ تعديل المحفظة"):
+
 
             cursor.execute("""
             UPDATE wallets
             SET balance = ?
             WHERE partner_name = ?
+            AND account_type = ?
             """, (
                 new_balance,
-                partner_edit
+                partner,
+                wallet_type
             ))
 
             conn.commit()
 
-            st.success(
-                f"تم تحديث رصيد {partner_edit}"
-            )
-
-            st.rerun()
-
-        # ==========================
-        # تغيير الرمز السري
-        # ==========================
+            st.success("تم تعديل المحفظة")
 
         st.divider()
 
-        st.subheader("🔑 تغيير الرمز السري")
+        # تعديل الخزائن
+        st.subheader("🏦 تعديل الخزائن")
 
-        old_token = st.text_input(
-            "الرمز الحالي",
-            type="password"
+        capital_type = st.selectbox(
+            "نوع الخزنة",
+            ["cash", "bank"]
         )
 
-        new_token = st.text_input(
-            "الرمز الجديد",
-            type="password"
+        capital_balance = st.number_input(
+            "الرصيد",
+            min_value=0.0,
+            step=1.0,
+            key="capital_edit"
         )
 
-        if st.button("تغيير الرمز"):
+        if st.button("حفظ تعديل الخزنة"):
 
-            found = False
+            cursor.execute("""
+            UPDATE capital_accounts
+            SET balance = ?
+            WHERE account_type = ?
+            """, (
+                capital_balance,
+                capital_type
+            ))
 
-            for token, user in list(USER_TOKENS.items()):
+            cursor.execute("""
+            INSERT INTO financial_logs
+            (action_type, account_type, amount, note)
+            VALUES (?, ?, ?, ?)
+            """, (
+                "تعديل خزنة",
+                capital_type,
+                capital_balance,
+                "تعديل يدوي"
+            ))
 
-                if (
-                    user == current_user
-                    and token == old_token
-                ):
+            conn.commit()
 
-                    del USER_TOKENS[token]
+            st.success("تم تعديل الخزنة")
 
-                    USER_TOKENS[new_token] = current_user
-
-                    st.success(
-                        "تم تغيير الرمز السري بنجاح"
-                    )
-
-                    found = True
-
-                    break
-
-            if not found:
-                st.error("الرمز الحالي غير صحيح")
-
-    # ==========================================
-    # إضافة وتحديث البضاعة
-    # ==========================================
+    # =====================================
+    # إضافة بضاعة
+    # =====================================
 
     elif choice == "إضافة وتحديث البضاعة":
 
-        st.header("🛒 إدارة البضاعة")
+        st.header("📦 إدارة المخزون")
 
         p_name = st.text_input(
             "اسم المنتج"
@@ -355,17 +459,15 @@ else:
         if p_name:
 
             cursor.execute("""
-            SELECT id, quantity, fixed_capital, selling_price
-            FROM products
+            SELECT * FROM products
             WHERE name = ?
             """, (p_name,))
 
             existing = cursor.fetchone()
 
             if existing:
-
                 st.warning(
-                    f"المنتج موجود مسبقاً | ID: {existing[0]}"
+                    f"المنتج موجود | ID: {existing[0]}"
                 )
 
             qty = st.number_input(
@@ -375,41 +477,44 @@ else:
             )
 
             price_yuan = st.number_input(
-                "سعر المنتج باليوان",
+                "السعر باليوان",
                 min_value=0.0,
                 step=0.5
             )
 
             weight = st.number_input(
-                "وزن القطعة",
+                "الوزن",
                 min_value=0.0,
                 step=0.05
             )
 
             pack_cost = st.number_input(
-                "تكلفة التغليف",
+                "التغليف",
                 min_value=0.0,
                 step=0.5
             )
 
             bag_cost = st.number_input(
-                "تكلفة الكيس",
+                "الكيس",
                 min_value=0.0,
                 step=0.5
             )
 
             dollar_rate = st.number_input(
-                "سعر الدولار",
-                min_value=0.0,
+                "الدولار",
                 value=7.1,
                 step=0.05
             )
 
             shipping_rate = st.number_input(
-                "الشحن لكل كيلو",
-                min_value=0.0,
+                "الشحن",
                 value=12.5,
                 step=0.5
+            )
+
+            payment_source = st.radio(
+                "مصدر الشراء",
+                ["cash", "bank"]
             )
 
             calculated_cap = 0
@@ -429,13 +534,6 @@ else:
                     f"رأس المال للقطعة: {calculated_cap} د.ل"
                 )
 
-                st.success(
-                    f"سعر بيع مقترح: "
-                    f"{round(calculated_cap*1.3)}"
-                    f" - "
-                    f"{round(calculated_cap*1.7)} د.ل"
-                )
-
             selling_price = st.number_input(
                 "سعر البيع",
                 min_value=0.0,
@@ -444,58 +542,92 @@ else:
 
             if st.button("حفظ المنتج"):
 
-                if existing:
+                total_cost = calculated_cap * qty
 
-                    total_qty = existing[1] + qty
+                cursor.execute("""
+                SELECT balance
+                FROM capital_accounts
+                WHERE account_type = ?
+                """, (payment_source,))
 
-                    cursor.execute("""
-                    UPDATE products
-                    SET quantity=?,
-                        fixed_capital=?,
-                        selling_price=?
-                    WHERE id=?
-                    """, (
-                        total_qty,
-                        calculated_cap,
-                        selling_price,
-                        existing[0]
-                    ))
+                current_capital = cursor.fetchone()[0]
+
+                if total_cost > current_capital:
+
+                    st.error(
+                        "الرصيد غير كافي في الخزنة"
+                    )
 
                 else:
 
-                    cursor.execute("""
-                    INSERT INTO products
-                    (
-                        name,
-                        quantity,
-                        fixed_capital,
-                        selling_price
+
+                    new_capital = (
+                        current_capital - total_cost
                     )
-                    VALUES (?, ?, ?, ?)
+
+                    cursor.execute("""
+                    UPDATE capital_accounts
+                    SET balance = ?
+                    WHERE account_type = ?
                     """, (
-                        p_name,
-                        qty,
-                        calculated_cap,
-                        selling_price
+                        new_capital,
+                        payment_source
                     ))
 
-                conn.commit()
+                    if existing:
 
-                st.success("تم حفظ المنتج")
+                        cursor.execute("""
+                        UPDATE products
+                        SET quantity = quantity + ?,
+                            fixed_capital = ?,
+                            selling_price = ?
+                        WHERE name = ?
+                        """, (
+                            qty,
+                            calculated_cap,
+                            selling_price,
+                            p_name
+                        ))
 
-        # ==========================
-        # حذف منتج
-        # ==========================
+                    else:
+
+                        cursor.execute("""
+                        INSERT INTO products
+                        (name, quantity, fixed_capital, selling_price)
+                        VALUES (?, ?, ?, ?)
+                        """, (
+                            p_name,
+                            qty,
+                            calculated_cap,
+                            selling_price
+                        ))
+
+                    cursor.execute("""
+                    INSERT INTO financial_logs
+                    (action_type, account_type, amount, note)
+                    VALUES (?, ?, ?, ?)
+                    """, (
+                        "شراء بضاعة",
+                        payment_source,
+                        -total_cost,
+                        p_name
+                    ))
+
+                    conn.commit()
+
+                    st.success(
+                        "تمت إضافة البضاعة بنجاح"
+                    )
 
         st.divider()
 
-        st.subheader("🗑️ حذف منتج")
+        # حذف منتج
+        st.subheader("🗑 حذف منتج")
 
         delete_id = st.number_input(
-            "رقم المنتج للحذف",
+            "رقم المنتج",
             min_value=1,
-            step=1,
-            key="delete_product"
+            step=1
         )
 
         if st.button("حذف المنتج"):
@@ -506,9 +638,9 @@ else:
             WHERE id = ?
             """, (delete_id,))
 
-            check = cursor.fetchone()
+            found = cursor.fetchone()
 
-            if check:
+            if found:
 
                 cursor.execute("""
                 DELETE FROM products
@@ -518,19 +650,19 @@ else:
                 conn.commit()
 
                 st.success(
-                    f"تم حذف المنتج: {check[0]}"
+                    f"تم حذف {found[0]}"
                 )
 
             else:
                 st.error("المنتج غير موجود")
 
-    # ==========================================
-    # تسجيل عملية بيع
-    # ==========================================
+    # =====================================
+    # البيع
+    # =====================================
 
     elif choice == "تسجيل عملية بيع":
 
-        st.header("💰 تسجيل عملية بيع")
+        st.header("💵 تسجيل عملية بيع")
 
         p_id = st.number_input(
             "رقم المنتج",
@@ -539,24 +671,23 @@ else:
         )
 
         qty_to_sell = st.number_input(
-            "الكمية المباعة",
+            "الكمية",
             min_value=1,
             step=1
         )
 
         payment_method = st.radio(
             "طريقة الدفع",
-            ["كاش", "مصرف"]
+            ["cash", "bank"]
         )
 
         if st.button("إتمام البيع"):
 
             cursor.execute("""
-            SELECT
-                name,
-                quantity,
-                fixed_capital,
-                selling_price
+            SELECT name,
+                   quantity,
+                   fixed_capital,
+                   selling_price
             FROM products
             WHERE id = ?
             """, (p_id,))
@@ -567,12 +698,6 @@ else:
 
                 st.error("المنتج غير موجود")
 
-            elif product[1] < qty_to_sell:
-
-                st.error(
-                    f"المتوفر فقط {product[1]}"
-                )
-
             else:
 
                 name = product[0]
@@ -580,39 +705,25 @@ else:
                 capital = product[2]
                 price = product[3]
 
-                total_before_discount = (
-                    price * qty_to_sell
-                )
+                if current_qty < qty_to_sell:
 
-                discount = (
-                    round(
-                        total_before_discount * 0.05,
-                        2
-                    )
-                    if qty_to_sell >= 2
-                    else 0.0
-                )
-
-                final_total = (
-                    total_before_discount - discount
-                )
-
-                total_capital_cost = (
-                    capital * qty_to_sell
-                )
-
-                net_profit = round(
-                    final_total - total_capital_cost,
-                    2
-                )
-
-                if final_total < total_capital_cost:
-
-                    st.error(
-                        "الخصم أكل رأس المال"
-                    )
+                    st.error("الكمية غير كافية")
 
                 else:
+
+                    total_sale = (
+                        price * qty_to_sell
+                    )
+
+                    total_capital = (
+                        capital * qty_to_sell
+                    )
+
+
+                    net_profit = round(
+                        total_sale - total_capital,
+                        2
+                    )
 
                     # تحديث الكمية
                     cursor.execute("""
@@ -624,25 +735,53 @@ else:
                         p_id
                     ))
 
+                    # إضافة رأس المال للخزنة
+                    cursor.execute("""
+                    SELECT balance
+                    FROM capital_accounts
+                    WHERE account_type = ?
+                    """, (payment_method,))
+
+                    current_balance = cursor.fetchone()[0]
+
+                    new_balance = (
+                        current_balance + total_capital
+                    )
+
+                    cursor.execute("""
+                    UPDATE capital_accounts
+                    SET balance = ?
+                    WHERE account_type = ?
+                    """, (
+                        new_balance,
+                        payment_method
+                    ))
+
                     # توزيع الأرباح
                     share = round(
                         net_profit / 2,
                         2
                     )
 
-                    if share > 0:
+                    cursor.execute("""
+                    UPDATE wallets
+                    SET balance = balance + ?
+                    WHERE partner_name = 'Bashir'
+                    AND account_type = ?
+                    """, (
+                        share,
+                        payment_method
+                    ))
 
-                        cursor.execute("""
-                        UPDATE wallets
-                        SET balance = balance + ?
-                        WHERE partner_name = 'Bashir'
-                        """, (share,))
-
-                        cursor.execute("""
-                        UPDATE wallets
-                        SET balance = balance + ?
-                        WHERE partner_name = 'Ahmed'
-                        """, (share,))
+                    cursor.execute("""
+                    UPDATE wallets
+                    SET balance = balance + ?
+                    WHERE partner_name = 'Ahmed'
+                    AND account_type = ?
+                    """, (
+                        share,
+                        payment_method
+                    ))
 
                     # تسجيل العملية
                     cursor.execute("""
@@ -651,41 +790,40 @@ else:
                         product_name,
                         quantity,
                         total,
+                        capital,
                         profit,
                         payment_method
                     )
-                    VALUES (?, ?, ?, ?, ?)
+                    VALUES (?, ?, ?, ?, ?, ?)
                     """, (
                         name,
                         qty_to_sell,
-                        final_total,
+                        total_sale,
+                        total_capital,
                         net_profit,
                         payment_method
+                    ))
+
+                    cursor.execute("""
+                    INSERT INTO financial_logs
+                    (action_type, account_type, amount, note)
+                    VALUES (?, ?, ?, ?)
+                    """, (
+                        "بيع",
+                        payment_method,
+                        total_sale,
+                        name
                     ))
 
                     conn.commit()
 
                     st.success(
-                        f"تم البيع بنجاح | "
-                        f"الربح الصافي: {net_profit} د.ل"
+                        f"تم البيع | الربح {net_profit} د.ل"
                     )
 
-                    st.info(
-                        f"طريقة الدفع: {payment_method}"
-                    )
-
-                    if (
-                        current_qty - qty_to_sell
-                    ) <= 3:
-
-                        st.warning(
-                            f"المتبقي فقط "
-                            f"{current_qty - qty_to_sell}"
-                        )
-
-    # ==========================================
-    # الاستعلام عن منتج
-    # ==========================================
+    # =====================================
+    # البحث
+    # =====================================
 
     elif choice == "الاستعلام عن منتج":
 
@@ -700,11 +838,7 @@ else:
         if st.button("بحث"):
 
             cursor.execute("""
-            SELECT
-                name,
-                quantity,
-                fixed_capital,
-                selling_price
+            SELECT *
             FROM products
             WHERE id = ?
             """, (search_id,))
@@ -713,55 +847,81 @@ else:
 
             if prod:
 
-                st.write(f"اسم المنتج: {prod[0]}")
-                st.write(f"الكمية: {prod[1]}")
-                st.write(
-                    f"رأس المال: {prod[2]} د.ل"
-                )
-                st.write(
-                    f"سعر البيع: {prod[3]} د.ل"
-                )
+                st.success("تم العثور على المنتج")
+
+                st.write(f"📦 الاسم: {prod[1]}")
+                st.write(f"📦 الكمية: {prod[2]}")
+                st.write(f"💰 رأس المال: {prod[3]}")
+                st.write(f"💵 سعر البيع: {prod[4]}")
 
             else:
                 st.error("المنتج غير موجود")
 
-    # ==========================================
+
+    # =====================================
     # سجل العمليات
-    # ==========================================
+    # =====================================
 
     elif choice == "سجل العمليات":
 
-        st.header("📑 سجل العمليات")
+        st.header("📑 سجل المبيعات")
 
         cursor.execute("""
-        SELECT
-            product_name,
-            quantity,
-            total,
-            profit,
-            payment_method,
-            created_at
+        SELECT *
         FROM transactions
         ORDER BY id DESC
         """)
 
-        operations = cursor.fetchall()
+        rows = cursor.fetchall()
 
-        if operations:
+        if rows:
 
-            for op in operations:
+            for row in rows:
 
                 st.container()
 
-                st.write(f"🛒 المنتج: {op[0]}")
-                st.write(f"📦 الكمية: {op[1]}")
-                st.write(f"💰 الإجمالي: {op[2]} د.ل")
-                st.write(f"📈 الربح: {op[3]} د.ل")
-                st.write(f"🏦 الدفع: {op[4]}")
-                st.write(f"🕒 التاريخ: {op[5]}")
+                st.write(f"🛒 المنتج: {row[1]}")
+                st.write(f"📦 الكمية: {row[2]}")
+                st.write(f"💰 المبيعات: {row[3]} د.ل")
+                st.write(f"🏦 رأس المال: {row[4]} د.ل")
+                st.write(f"📈 الربح: {row[5]} د.ل")
+                st.write(f"💳 الدفع: {row[6]}")
+                st.write(f"🕒 التاريخ: {row[7]}")
 
                 st.divider()
 
         else:
+            st.info("لا توجد عمليات")
 
-            st.info("لا توجد عمليات حالياً")
+    # =====================================
+    # السجل المالي
+    # =====================================
+
+    elif choice == "السجل المالي":
+
+        st.header("📚 السجل المالي الكامل")
+
+        cursor.execute("""
+        SELECT *
+        FROM financial_logs
+        ORDER BY id DESC
+        """)
+
+        logs = cursor.fetchall()
+
+        if logs:
+
+            for log in logs:
+
+                st.write(
+                    f"{log[5]} | "
+                    f"{log[1]} | "
+                    f"{log[2]} | "
+                    f"{log[3]} د.ل | "
+                    f"{log[4]}"
+                )
+
+                st.divider()
+
+        else:
+            st.info("السجل المالي فارغ")
